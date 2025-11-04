@@ -32,7 +32,6 @@ std::vector<Product> DataProcessing::parseJsonData() {
                 continue;
             }
 
-            // Extract product information
             product.id = item["id"].get<int>();
             product.title = item["title"].get<std::string>();
             product.price = item["price"].get<double>();
