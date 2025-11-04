@@ -11,7 +11,7 @@ class ReceiveData {
 public:
   ReceiveData(std::string urlAddress) : url(urlAddress){};
   ~ReceiveData() = default;
-  int SendRquestAndHandleIt();
+  std::string SendRquestAndHandleIt();
 
 private:
   const std::string url;

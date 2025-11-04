@@ -1,5 +1,5 @@
 #include "ReceiveData.hpp"
-#include "DataProcessing.hpp"
+#include <stdexcept>
 
 size_t ReceiveData::WriteCallback(void *contents, size_t size, size_t nmemb,
                                   void *userp) {
@@ -22,7 +22,7 @@ void ReceiveData::WaitBeforeRetry(int attempt) {
   std::this_thread::sleep_for(std::chrono::milliseconds(delay));
 }
 
-int ReceiveData::SendRquestAndHandleIt() {
+std::string ReceiveData::SendRquestAndHandleIt() {
 
   const int maxRetries = 3;
 
@@ -30,7 +30,7 @@ int ReceiveData::SendRquestAndHandleIt() {
   CURL *curl = curl_easy_init();
   if (!curl) {
     std::cerr << "Failed to initialize CURL." << std::endl;
-    return 1;
+    throw std::runtime_error("Failed to initialize CURL");
   }
 
   std::string response;
@@ -69,17 +69,14 @@ int ReceiveData::SendRquestAndHandleIt() {
 
       case CURLE_PEER_FAILED_VERIFICATION:
       case CURLE_SSL_CONNECT_ERROR:
-        std::cerr << "SSL/TLS error. Please verify certificates and system "
-                     "time.\n";
         curl_easy_cleanup(curl);
         curl_global_cleanup();
-        return 2;
+        throw std::runtime_error("SSL/TLS error. Please verify certificates and system time.");
 
       default:
-        std::cerr << "Unhandled CURL error.\n";
         curl_easy_cleanup(curl);
         curl_global_cleanup();
-        return 3;
+        throw std::runtime_error("Unhandled CURL error: " + std::string(curl_easy_strerror(res)));
       }
     }
 
@@ -105,28 +102,16 @@ int ReceiveData::SendRquestAndHandleIt() {
     }
   }
 
-  // Parsing and Logic Error Handling
-  if (success) {
-    //   try {
-    //     auto jsonData = json::parse(response);
-
-    //     std::cout << "\nProduct list:\n";
-    //     for (const auto &item : jsonData) {
-    //       std::cout << " - " << item["title"] << " ($" << item["price"] <<
-    //       ")\n";
-    //     }
-    //   } catch (const std::exception &e) {
-    //     std::cerr << "JSON parsing failed: " << e.what() << std::endl;
-    //   }
-
-    DataProcessing processor(response);
-    auto products = processor.parseJsonData();
-
-  } else {
-    std::cerr << "Failed to fetch data after " << maxRetries << " attempts.\n";
+  if (!success) {
+    curl_easy_cleanup(curl);
+    curl_global_cleanup();
+    throw std::runtime_error("Failed to fetch data after " + std::to_string(maxRetries) + " attempts");
   }
 
+  // Clean up CURL
   curl_easy_cleanup(curl);
   curl_global_cleanup();
-  return 0;
+  
+  // Return the JSON response
+  return response;
 }
